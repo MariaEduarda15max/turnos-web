@@ -52,10 +52,16 @@ export default async function DashboardPage() {
         >
           Servicios
         </Link>
+        <Link
+          href="/dashboard/horarios"
+          className="rounded-md border border-bosque-100 bg-white px-4 py-2 text-sm text-bosque-700 hover:border-bosque-400 transition-colors"
+        >
+          Horarios
+        </Link>
       </nav>
 
       <p className="text-bosque-500 text-sm mt-4">
-        Disponibilidad, turnos y pedidos — próximos pasos.
+        Turnos y pedidos — próximos pasos.
       </p>
     </main>
   );

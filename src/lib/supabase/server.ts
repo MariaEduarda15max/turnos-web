@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 // Para usar dentro de Server Components, Server Actions y Route Handlers.
@@ -16,7 +16,10 @@ export async function crearClienteServidor() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        // Tipado explícito: con @supabase/ssr 0.5.x, TypeScript no logra
+        // inferir el tipo acá (createServerClient tiene sobrecargas) y
+        // `npm run build` falla con "implicitly has an 'any' type".
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),

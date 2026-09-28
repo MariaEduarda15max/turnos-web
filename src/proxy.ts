@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Las sesiones de Supabase expiran y se renuevan con un token de refresco.
@@ -21,7 +21,10 @@ export async function proxy(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        // Tipado explícito: con @supabase/ssr 0.5.x, TypeScript no logra
+        // inferir el tipo acá (createServerClient tiene sobrecargas) y
+        // `npm run build` falla con "implicitly has an 'any' type".
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );

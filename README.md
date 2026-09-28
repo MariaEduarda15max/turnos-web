@@ -12,9 +12,11 @@ reserva pública para clientes sin necesidad de cuenta.
 - [x] Dashboard protegido, con aislamiento real entre negocios (RLS, no solo
       lógica de frontend)
 - [x] Gestión de Servicios (crear, activar/desactivar, borrar)
-- [ ] Gestión de Disponibilidad
-- [ ] Reserva pública de turnos (sin cuenta) + turnos con token de acceso
-- [ ] "Mis turnos" para clientes con cuenta
+- [x] Gestión de Disponibilidad/Horarios, con anti-solape de franjas
+- [x] Reserva pública de turnos (sin cuenta), con horarios calculados en
+      tiempo real y anti-doble-reserva
+- [x] Ver/cancelar/reprogramar un turno vía link con token, sin cuenta
+- [ ] "Mis turnos" para clientes con cuenta (fusión de turnos de invitado)
 - [ ] Gestión de Pedidos
 
 ## Stack
@@ -95,9 +97,13 @@ npm run dev
 ```
 src/
   proxy.ts                        # refresca la sesión en cada request (ver nota abajo)
-  lib/supabase/
-    client.ts                     # cliente para Client Components (navegador)
-    server.ts                     # cliente para Server Components/Actions
+  lib/
+    fechas.ts                     # zona horaria fija, mismo patrón que turnos-bot
+    slots.ts                      # cálculo de horarios libres, compartido
+    supabase/
+      client.ts                   # Client Components (navegador)
+      server.ts                   # Server Components/Actions autenticados
+      publico.ts                  # secret key, SOLO server-side, para la reserva pública
   app/
     login/page.tsx
     registro/page.tsx
@@ -107,9 +113,24 @@ src/
       servicios/
         page.tsx
         actions.ts                 # Server Actions: crear/activar/borrar
+        FormularioAgregarServicio.tsx
+        BotonBorrarServicio.tsx
+      horarios/                    # disponibilidad, con anti-solape
+    r/
+      [negocioId]/                 # reserva pública — sin login
+        page.tsx                   # elegir servicio → día → horario → confirmar
+        actions.ts
+        FormularioReserva.tsx
+        turno/
+          [token]/                 # ver/cancelar/reprogramar por link, sin cuenta
+            page.tsx
+            actions.ts
+            BotonCancelar.tsx
+            FormularioReprogramar.tsx
 supabase/
   migrations/
     0001_init.sql                 # schema completo: tablas, RLS, funciones
+    0002_disponibilidad_sin_solapes.sql
 ```
 
 ## Decisiones de diseño que vale la pena entender
@@ -127,6 +148,19 @@ valida la sesión del lado del servidor, como segunda capa.
 `clientes`): una para el negocio dueño, otra para el cliente con cuenta.
 Postgres las combina con OR — si algo "no se ve" cuando debería, revisar que
 estén las dos, no solo una.
+
+**La reserva pública NO usa políticas de RLS abiertas al público.** Para
+calcular horarios libres hace falta leer `turnos` y `bloqueos`, no solo
+`servicios`/`disponibilidad` — y `turnos` tiene datos de clientes reales.
+Abrir eso a "cualquiera" expondría más de lo necesario. En cambio,
+`lib/supabase/publico.ts` usa la secret key (bypasea RLS por diseño, igual
+que la función `telegram-webhook` de `turnos-bot`) y el código decide
+explícitamente qué exponer — nunca las filas crudas.
+
+**Acceso por token para clientes sin cuenta.** Cada turno tiene un
+`token_acceso` (uuid) único — quien tenga ese link puede ver/cancelar/
+reprogramar ESE turno puntual, sin login. Es el mismo patrón que usaba el
+bot con "Mis turnos", adaptado a web.
 
 **Server Actions con `.bind()`** para pasar argumentos (ver
 `servicios/actions.ts` + `page.tsx`): permite que un botón de una lista
