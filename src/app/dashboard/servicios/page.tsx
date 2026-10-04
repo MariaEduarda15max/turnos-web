@@ -11,11 +11,19 @@ export default async function ServiciosPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // RLS filtra automáticamente por negocio_actual() — esta consulta solo
-  // puede devolver los servicios de ESTE negocio, nunca los de otro.
+  // Una cuenta de CLIENTE también puede tener sesión (comparte el mismo
+  // navegador/cookies). Sin negocio propio no hay nada que administrar acá:
+  // se vuelve al panel, que muestra "No se encontró un negocio".
+  const { data: negocio } = await supabase.from("negocios").select("id").single();
+  if (!negocio) redirect("/dashboard");
+
+  // Filtro explícito por negocio: desde la 0004, RLS también deja a un
+  // cliente leer los servicios de SUS turnos, así que "lo que RLS deja
+  // ver" ya no equivale a "los servicios de mi negocio".
   const { data: servicios } = await supabase
     .from("servicios")
     .select("id, nombre, duracion_min, activo")
+    .eq("negocio_id", negocio.id)
     .order("nombre");
 
   return (

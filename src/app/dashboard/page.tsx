@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   // falta filtrar por auth_user_id acá, Postgres ya lo hace por nosotros.
   const { data: negocio, error } = await supabase
     .from("negocios")
-    .select("nombre, email_admin, creado_en")
+    .select("id, nombre, email_admin, creado_en")
     .single();
 
   return (
@@ -41,6 +41,15 @@ export default async function DashboardPage() {
           <p className="text-bosque-700">
             <span className="text-bosque-500 text-sm">Registrado el:</span>{" "}
             {new Date(negocio.creado_en).toLocaleDateString("es-UY")}
+          </p>
+          {/* Los clientes no entran por la home (que es del negocio): entran
+              por este link, que el negocio comparte. Desde ahí pueden
+              reservar como invitados o crearse una cuenta. */}
+          <p className="text-bosque-700">
+            <span className="text-bosque-500 text-sm">Link de reservas para tus clientes:</span>{" "}
+            <Link href={`/r/${negocio.id}`} className="text-arcilla-600 hover:underline break-all">
+              /r/{negocio.id}
+            </Link>
           </p>
         </div>
       )}

@@ -1,7 +1,7 @@
 "use server";
 
 import { crearClientePublico } from "@/lib/supabase/publico";
-import { fechaMontevideo } from "@/lib/fechas";
+import { esHoraValida, fechaMontevideo } from "@/lib/fechas";
 
 export type EstadoAccionToken = { error: string | null; ok: boolean };
 
@@ -29,6 +29,10 @@ export async function reprogramarTurno(
   hora: string,
   _estadoPrevio: EstadoAccionToken,
 ): Promise<EstadoAccionToken> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !esHoraValida(hora)) {
+    return { ...estadoInicial, error: "Fecha u hora inválida. Volvé a elegir el horario." };
+  }
+
   const supabase = crearClientePublico();
 
   const { data: turno } = await supabase

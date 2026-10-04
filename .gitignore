@@ -5,3 +5,9 @@ node_modules/
 next-env.d.ts
 supabase/.temp/
 node_modules
+
+# TypeScript
+*.tsbuildinfo
+
+# Archivos de sesiones de Claude
+Claude outputs/

@@ -1,7 +1,7 @@
 "use server";
 
 import { crearClientePublico } from "@/lib/supabase/publico";
-import { fechaMontevideo } from "@/lib/fechas";
+import { esHoraValida, fechaMontevideo } from "@/lib/fechas";
 
 export type EstadoReserva = { error: string | null; tokenAcceso: string | null };
 
@@ -23,6 +23,10 @@ export async function reservarTurno(
 
   if (!nombre || (!email && !telefono)) {
     return { ...estadoInicial, error: "Nombre y (email o teléfono) son obligatorios." };
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !esHoraValida(hora)) {
+    return { ...estadoInicial, error: "Fecha u hora inválida. Volvé a elegir el horario." };
   }
 
   // El servicio TIENE que ser de este negocio — sin este chequeo, alguien

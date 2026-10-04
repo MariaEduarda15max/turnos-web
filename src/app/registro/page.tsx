@@ -14,12 +14,26 @@ export default function RegistroPage() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
+  const [emailEnviado, setEmailEnviado] = useState<string | null>(null);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setCargando(true);
     setError(null);
 
-    const { data, error: errorAuth } = await supabase.auth.signUp({ email, password });
+    const emailNormalizado = email.trim().toLowerCase();
+
+    // Con "Confirm email" activado, signUp NO abre sesión: la fila de
+    // `negocios` se crea recién en /auth/confirm (completar_alta_negocio,
+    // migración 0005). El nombre del negocio viaja en la metadata.
+    const { data, error: errorAuth } = await supabase.auth.signUp({
+      email: emailNormalizado,
+      password,
+      options: {
+        data: { nombre_negocio: nombre.trim() },
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent("/dashboard")}`,
+      },
+    });
 
     if (errorAuth || !data.user) {
       setError(errorAuth?.message ?? "No se pudo crear la cuenta.");
@@ -27,29 +41,50 @@ export default function RegistroPage() {
       return;
     }
 
-    // Crea la fila en `negocios` ligada a este usuario recién autenticado.
-    // RLS exige auth_user_id = auth.uid() — esto solo funciona si Supabase
-    // ya dejó al usuario logueado en este mismo paso (auto-confirmación de
-    // email activada en el proyecto). Si el proyecto pide confirmar el
-    // email antes de dar sesión, este insert falla acá — hay que revisar
-    // Authentication → Settings → "Confirm email" en el dashboard.
-    const { error: errorNegocio } = await supabase.from("negocios").insert({
-      nombre,
-      email_admin: email,
-      auth_user_id: data.user.id,
-    });
-
-    if (errorNegocio) {
-      setError(
-        "La cuenta se creó, pero hubo un error registrando el negocio: " +
-          errorNegocio.message,
-      );
+    if (data.user.identities?.length === 0) {
+      setError("Ese email ya tiene una cuenta. Ingresá con tu contraseña.");
       setCargando(false);
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    // Confirmación desactivada en el proyecto: ya hay sesión.
+    if (data.session) {
+      const { error: errorNegocio } = await supabase.rpc("completar_alta_negocio");
+      if (errorNegocio) {
+        setError(
+          "La cuenta se creó, pero hubo un error registrando el negocio: " +
+            errorNegocio.message,
+        );
+        setCargando(false);
+        return;
+      }
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    setEmailEnviado(emailNormalizado);
+    setCargando(false);
+  }
+
+  if (emailEnviado) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-6">
+        <div className="w-full max-w-sm">
+          <h1 className="font-display text-3xl text-bosque-800 mb-3">Revisá tu email</h1>
+          <p className="text-bosque-600 text-sm">
+            Te mandamos un link a <strong>{emailEnviado}</strong> para confirmar la cuenta.
+            Abrilo desde este mismo navegador y vas a entrar directo al panel.
+          </p>
+          <p className="text-sm text-bosque-600 mt-6">
+            ¿Ya lo confirmaste?{" "}
+            <Link href="/login" className="text-arcilla-600 hover:underline">
+              Ingresar
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (

@@ -18,10 +18,27 @@ export default function LoginPage() {
     setCargando(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
     if (error) {
-      setError("Email o contraseña incorrectos.");
+      setError(
+        error.code === "email_not_confirmed"
+          ? "Todavía no confirmaste tu email. Revisá tu bandeja de entrada."
+          : "Email o contraseña incorrectos.",
+      );
+      setCargando(false);
+      return;
+    }
+
+    // Idempotente: si el negocio ya existe no hace nada. Cubre el caso de
+    // haber confirmado el email desde otro navegador/dispositivo (ahí
+    // /auth/confirm no pudo abrir sesión ni crear el negocio).
+    const { error: errorAlta } = await supabase.rpc("completar_alta_negocio");
+    if (errorAlta) {
+      setError("Ingresaste, pero hubo un error registrando el negocio: " + errorAlta.message);
       setCargando(false);
       return;
     }

@@ -89,17 +89,28 @@ export async function calcularHorariosLibres(
       const seSolapa = ocupados.some((o) => cursor < o.hasta && cursorFin > o.desde);
 
       if (!seSolapa && cursor.getTime() > Date.now()) {
-        libres.push(
-          cursor.toLocaleTimeString("es-UY", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "America/Montevideo",
-          }),
-        );
+        // SIEMPRE "HH:MM" en 24 h: este string viaja de vuelta al servidor
+        // y se convierte en fecha. Con toLocaleTimeString("es-UY") el
+        // formato depende de la versión de ICU/Node — en algunas sale
+        // "03:30 p. m.", y al recortarlo quedaba "03:30" (¡de la mañana!).
+        libres.push(horaHHMM(cursor));
       }
       cursor = cursorFin;
     }
   }
 
   return libres;
+}
+
+// "HH:MM" en 24 h, hora de Montevideo, sin depender del locale.
+function horaHHMM(fecha: Date): string {
+  const partes = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "America/Montevideo",
+  }).formatToParts(fecha);
+  const hh = partes.find((p) => p.type === "hour")?.value ?? "00";
+  const mm = partes.find((p) => p.type === "minute")?.value ?? "00";
+  return `${hh}:${mm}`;
 }

@@ -36,7 +36,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
       .order("nombre");
 
     return (
-      <Layout negocioNombre={negocio.nombre} paso={1}>
+      <Layout negocioNombre={negocio.nombre} paso={1} negocioId={negocioId}>
         {(!servicios || servicios.length === 0) && (
           <p className="text-bosque-500 text-sm">
             Este negocio no tiene servicios disponibles en este momento.
@@ -73,7 +73,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
     const diasDisponibles = await diasConDisponibilidad(supabase, negocioId);
 
     return (
-      <Layout negocioNombre={negocio.nombre} paso={2} servicioNombre={servicio.nombre}>
+      <Layout negocioNombre={negocio.nombre} paso={2} servicioNombre={servicio.nombre} negocioId={negocioId}>
         {diasDisponibles.length === 0 && (
           <p className="text-bosque-500 text-sm">No hay días disponibles por ahora.</p>
         )}
@@ -97,7 +97,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
   const horarios = await calcularHorariosLibres(supabase, negocioId, servicioId, dia);
 
   return (
-    <Layout negocioNombre={negocio.nombre} paso={3} servicioNombre={servicio.nombre}>
+    <Layout negocioNombre={negocio.nombre} paso={3} servicioNombre={servicio.nombre} negocioId={negocioId}>
       <p className="text-bosque-600 text-sm mb-4 capitalize">{formatearFecha(dia)}</p>
       <FormularioReserva
         negocioId={negocioId}
@@ -114,15 +114,27 @@ function Layout({
   negocioNombre,
   servicioNombre,
   paso,
+  negocioId,
 }: {
   children: React.ReactNode;
   negocioNombre: string;
   servicioNombre?: string;
   paso: 1 | 2 | 3;
+  negocioId: string;
 }) {
   return (
     <main className="min-h-screen px-6 py-10 max-w-md mx-auto">
-      <h1 className="font-display text-2xl text-bosque-800 mb-1">{negocioNombre}</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="font-display text-2xl text-bosque-800">{negocioNombre}</h1>
+        <div className="flex gap-3">
+          <Link href={`/r/${negocioId}/mis-turnos`} className="text-xs text-bosque-500 hover:text-arcilla-600">
+            Mis turnos
+          </Link>
+          <Link href={`/r/${negocioId}/cuenta/registro`} className="text-xs text-bosque-500 hover:text-arcilla-600">
+            Crear cuenta
+          </Link>
+        </div>
+      </div>
       <p className="text-bosque-500 text-sm mb-8">
         {paso === 1 && "Elegí un servicio"}
         {paso === 2 && `${servicioNombre} — elegí un día`}
