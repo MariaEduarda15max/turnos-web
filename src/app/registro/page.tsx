@@ -154,6 +154,14 @@ export default function RegistroPage() {
             Ingresar
           </Link>
         </p>
+
+        {/* El registro de clientes está atado a cada negocio
+            (/r/<negocioId>/cuenta/registro): desde acá no sabemos de qué
+            negocio es cliente la persona, así que solo se la orienta. */}
+        <p className="text-xs text-bosque-500 mt-8 border-t border-bosque-100 pt-4">
+          ¿Querés reservar un turno o crear tu cuenta de cliente? Entrá con el
+          link de reservas que te pasó tu negocio.
+        </p>
       </div>
     </main>
   );

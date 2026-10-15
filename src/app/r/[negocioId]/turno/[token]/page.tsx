@@ -1,5 +1,5 @@
 import { crearClientePublico } from "@/lib/supabase/publico";
-import { formatearFecha } from "@/lib/fechas";
+import { diaMontevideo, formatearFecha, horaMontevideo } from "@/lib/fechas";
 import { diasConDisponibilidad } from "@/lib/slots";
 import { calcularHorariosLibres } from "@/lib/slots";
 import { notFound } from "next/navigation";
@@ -37,13 +37,12 @@ export default async function TurnoPage({ params, searchParams }: Props) {
 
       <div className="rounded-lg border border-bosque-100 bg-white p-5 space-y-2 mb-6">
         <p className="text-bosque-800">{servicio.nombre}</p>
-        <p className="text-bosque-600 text-sm capitalize">
-          {formatearFecha(turno.inicio.slice(0, 10))} a las{" "}
-          {new Date(turno.inicio).toLocaleTimeString("es-UY", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "America/Montevideo",
-          })}
+        {/* Día y hora en Montevideo: inicio.slice(0, 10) tomaba la fecha
+            en UTC, y un turno de las 21:00 o más tarde aparecía al día
+            siguiente. */}
+        <p className="text-bosque-600 text-sm">
+          {formatearFecha(diaMontevideo(new Date(turno.inicio)))} a las{" "}
+          {horaMontevideo(new Date(turno.inicio))}
         </p>
         <p className="text-bosque-500 text-sm capitalize">Estado: {turno.estado}</p>
       </div>
@@ -93,7 +92,7 @@ async function ListaDias({ negocioId, token }: { negocioId: string; token: strin
           <li key={d}>
             <Link
               href={`/r/${negocioId}/turno/${token}?dia=${d}`}
-              className="block rounded-lg border border-bosque-100 bg-white px-4 py-3 hover:border-bosque-400 transition-colors capitalize"
+              className="block rounded-lg border border-bosque-100 bg-white px-4 py-3 hover:border-bosque-400 transition-colors"
             >
               {formatearFecha(d)}
             </Link>
@@ -124,7 +123,7 @@ async function ReprogramarConHorarios({
 
   return (
     <div>
-      <p className="text-bosque-600 text-sm mb-3 capitalize">{formatearFecha(dia)}</p>
+      <p className="text-bosque-600 text-sm mb-3">{formatearFecha(dia)}</p>
       <FormularioReprogramar token={token} dia={dia} horarios={horarios} />
     </div>
   );

@@ -1,7 +1,7 @@
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import CerrarSesionBoton from "./CerrarSesionBoton";
+import CerrarSesionBoton from "@/components/CerrarSesionBoton";
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
@@ -56,6 +56,12 @@ export default async function DashboardPage() {
 
       <nav className="flex gap-3 mt-8">
         <Link
+          href="/dashboard/turnos"
+          className="rounded-md border border-bosque-100 bg-white px-4 py-2 text-sm text-bosque-700 hover:border-bosque-400 transition-colors"
+        >
+          Turnos
+        </Link>
+        <Link
           href="/dashboard/servicios"
           className="rounded-md border border-bosque-100 bg-white px-4 py-2 text-sm text-bosque-700 hover:border-bosque-400 transition-colors"
         >
@@ -70,7 +76,7 @@ export default async function DashboardPage() {
       </nav>
 
       <p className="text-bosque-500 text-sm mt-4">
-        Turnos y pedidos — próximos pasos.
+        Pedidos — próximo paso.
       </p>
     </main>
   );

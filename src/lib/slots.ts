@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fechaMontevideo, ZONA_HORARIA } from "./fechas";
+import { fechaMontevideo, horaMontevideo, ZONA_HORARIA } from "./fechas";
 
 const DIAS_A_MOSTRAR = 14; // mismo criterio que turnos-bot, SPEC.md 1.2
 
@@ -93,24 +93,11 @@ export async function calcularHorariosLibres(
         // y se convierte en fecha. Con toLocaleTimeString("es-UY") el
         // formato depende de la versión de ICU/Node — en algunas sale
         // "03:30 p. m.", y al recortarlo quedaba "03:30" (¡de la mañana!).
-        libres.push(horaHHMM(cursor));
+        libres.push(horaMontevideo(cursor));
       }
       cursor = cursorFin;
     }
   }
 
   return libres;
-}
-
-// "HH:MM" en 24 h, hora de Montevideo, sin depender del locale.
-function horaHHMM(fecha: Date): string {
-  const partes = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "America/Montevideo",
-  }).formatToParts(fecha);
-  const hh = partes.find((p) => p.type === "hour")?.value ?? "00";
-  const mm = partes.find((p) => p.type === "minute")?.value ?? "00";
-  return `${hh}:${mm}`;
 }

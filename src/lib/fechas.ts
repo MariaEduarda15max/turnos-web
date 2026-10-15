@@ -25,10 +25,34 @@ export function fechaMontevideo(dia: string, horaHHMM: string): Date {
 
 export function formatearFecha(iso: string): string {
   const fecha = fechaMontevideo(iso, "00:00");
-  return fecha.toLocaleDateString("es-UY", {
+  const texto = fecha.toLocaleDateString("es-UY", {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone: ZONA_HORARIA,
   });
+  // Solo la primera letra en mayúscula. La clase CSS `capitalize` ponía
+  // mayúscula en CADA palabra ("Martes, 20 De Octubre").
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
+
+// "HH:MM" en 24 h, hora de Montevideo, sin depender del locale (con
+// toLocaleTimeString("es-UY") el formato cambia según la versión de ICU y
+// puede salir "03:30 p. m." — ver el bug de las 12 h).
+export function horaMontevideo(fecha: Date): string {
+  const partes = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: ZONA_HORARIA,
+  }).formatToParts(fecha);
+  const hh = partes.find((p) => p.type === "hour")?.value ?? "00";
+  const mm = partes.find((p) => p.type === "minute")?.value ?? "00";
+  return `${hh}:${mm}`;
+}
+
+// "YYYY-MM-DD" del día en Montevideo ("sv-SE" formatea así).
+export function diaMontevideo(fecha: Date): string {
+  return fecha.toLocaleDateString("sv-SE", { timeZone: ZONA_HORARIA });
+}
+

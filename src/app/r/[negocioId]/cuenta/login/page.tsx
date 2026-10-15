@@ -104,6 +104,13 @@ export default function LoginClientePage({
             Crear cuenta
           </Link>
         </p>
+
+        <p className="text-xs text-bosque-500 mt-8 border-t border-bosque-100 pt-4">
+          ¿Tenés un negocio?{" "}
+          <Link href="/registro" className="text-arcilla-600 hover:underline">
+            Registralo para gestionar tus turnos
+          </Link>
+        </p>
       </div>
     </main>
   );

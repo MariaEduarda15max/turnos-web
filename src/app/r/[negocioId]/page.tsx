@@ -82,7 +82,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
             <li key={d}>
               <Link
                 href={`/r/${negocioId}?servicioId=${servicioId}&dia=${d}`}
-                className="block rounded-lg border border-bosque-100 bg-white px-4 py-3 hover:border-bosque-400 transition-colors capitalize"
+                className="block rounded-lg border border-bosque-100 bg-white px-4 py-3 hover:border-bosque-400 transition-colors"
               >
                 {formatearFecha(d)}
               </Link>
@@ -98,7 +98,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
 
   return (
     <Layout negocioNombre={negocio.nombre} paso={3} servicioNombre={servicio.nombre} negocioId={negocioId}>
-      <p className="text-bosque-600 text-sm mb-4 capitalize">{formatearFecha(dia)}</p>
+      <p className="text-bosque-600 text-sm mb-4">{formatearFecha(dia)}</p>
       <FormularioReserva
         negocioId={negocioId}
         servicioId={servicioId}
