@@ -10,7 +10,12 @@ module.exports = {
           50: "#f2f6f3",
           100: "#dfe9e1",
           400: "#4a7a5d",
+          // 500 y 700: tonos intermedios. Se usaban en toda la app
+          // (text-bosque-500/700) pero no existían en la paleta, así que esos
+          // textos salían con el color por defecto.
+          500: "#3c644e",
           600: "#2f4f3f",
+          700: "#243e31",
           800: "#1a2e24",
           900: "#101f19",
         },

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { diaMontevideo, formatearFecha, horaMontevideo } from "@/lib/fechas";
 import FormularioPedido from "./FormularioPedido";
 import AccionPedido from "./AccionPedido";
+import EditarBorrarPedido from "./EditarBorrarPedido";
 
 type Pedido = {
   id: string;
@@ -63,6 +64,10 @@ export default async function PedidosPage() {
           <p className="text-bosque-600 text-sm">{p.clientes?.nombre ?? "Cliente"}</p>
           {contacto && <p className="text-bosque-400 text-xs break-all">{contacto}</p>}
           <p className="text-bosque-400 text-xs mt-1">{detalle}</p>
+          {/* Los entregados quedan como historial: no se editan ni se borran. */}
+          {p.estado !== "entregado" && (
+            <EditarBorrarPedido pedidoId={p.id} descripcion={p.descripcion} />
+          )}
         </div>
         {siguiente && <AccionPedido pedidoId={p.id} siguiente={siguiente} />}
       </li>

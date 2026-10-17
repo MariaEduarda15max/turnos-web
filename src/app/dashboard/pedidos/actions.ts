@@ -102,3 +102,51 @@ export async function avanzarPedido(
   revalidatePath(RUTA);
   return { error: null };
 }
+
+// Cambia solo la descripción. El cliente no se edita acá: si el pedido es
+// de otra persona, se borra y se carga de nuevo.
+export async function editarPedido(
+  pedidoId: string,
+  _estadoPrevio: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const descripcion = String(formData.get("descripcion") ?? "").trim();
+  if (!descripcion) return { error: "La descripción no puede quedar vacía." };
+
+  const { supabase, negocioId } = await obtenerNegocio();
+  if (!negocioId) return { error: "No se encontró el negocio de esta cuenta." };
+
+  const { data, error } = await supabase
+    .from("pedidos")
+    .update({ descripcion })
+    .eq("id", pedidoId)
+    .eq("negocio_id", negocioId)
+    .select("id");
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "No se encontró el pedido." };
+
+  revalidatePath(RUTA);
+  return { error: null };
+}
+
+export async function borrarPedido(
+  pedidoId: string,
+  _estadoPrevio: EstadoAccion,
+): Promise<EstadoAccion> {
+  const { supabase, negocioId } = await obtenerNegocio();
+  if (!negocioId) return { error: "No se encontró el negocio de esta cuenta." };
+
+  const { data, error } = await supabase
+    .from("pedidos")
+    .delete()
+    .eq("id", pedidoId)
+    .eq("negocio_id", negocioId)
+    .select("id");
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "No se encontró el pedido." };
+
+  revalidatePath(RUTA);
+  return { error: null };
+}
