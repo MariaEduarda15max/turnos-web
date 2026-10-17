@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 
 export type EstadoAccion = { error: string | null };
 
-// El negocio solo puede pasar un turno CONFIRMADO a cancelado o completado
-// ("atendido"). Nunca al revés: reabrir un turno cancelado podría pisar
+// El negocio solo puede pasar un turno CONFIRMADO a cancelado, completado
+// ("atendido") o ausente ("no vino"). Nunca al revés: reabrir un turno cancelado podría pisar
 // otro turno que ya se reservó en ese horario.
-const ESTADOS_PERMITIDOS = ["cancelado", "completado"] as const;
+const ESTADOS_PERMITIDOS = ["cancelado", "completado", "ausente"] as const;
 type NuevoEstado = (typeof ESTADOS_PERMITIDOS)[number];
 
 export async function cambiarEstadoTurno(

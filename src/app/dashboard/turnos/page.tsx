@@ -13,7 +13,7 @@ type Turno = {
   id: string;
   inicio: string;
   duracion_min: number;
-  estado: "confirmado" | "cancelado" | "completado";
+  estado: "confirmado" | "cancelado" | "completado" | "ausente";
   servicios: { nombre: string } | null;
   clientes: { nombre: string; email: string | null; telefono: string | null } | null;
 };
@@ -22,6 +22,7 @@ const ETIQUETA_ESTADO: Record<Turno["estado"], { texto: string; clase: string }>
   confirmado: { texto: "Confirmado", clase: "bg-bosque-50 text-bosque-600" },
   cancelado: { texto: "Cancelado", clase: "border border-arcilla-400 text-arcilla-600" },
   completado: { texto: "Atendido", clase: "bg-bosque-100 text-bosque-800" },
+  ausente: { texto: "No vino", clase: "border border-bosque-400 text-bosque-600" },
 };
 
 export default async function TurnosPage({

@@ -6,7 +6,7 @@ import { cambiarEstadoTurno, type EstadoAccion } from "./actions";
 const estadoInicial: EstadoAccion = { error: null };
 
 // Botones de un turno confirmado. Cancelar pide confirmación (no se puede
-// deshacer); "Atendido" solo aparece si el turno ya empezó.
+// deshacer); "Atendido" y "No vino" solo aparecen si el turno ya empezó.
 export default function AccionesTurno({
   turnoId,
   yaEmpezo,
@@ -24,9 +24,13 @@ export default function AccionesTurno({
     cambiarEstadoTurno.bind(null, turnoId, "completado"),
     estadoInicial,
   );
+  const [estadoAusente, marcarAusente, marcandoAusente] = useActionState(
+    cambiarEstadoTurno.bind(null, turnoId, "ausente"),
+    estadoInicial,
+  );
 
-  const error = estadoCancelar.error ?? estadoAtendido.error;
-  const ocupado = cancelando || marcando;
+  const error = estadoCancelar.error ?? estadoAtendido.error ?? estadoAusente.error;
+  const ocupado = cancelando || marcando || marcandoAusente;
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -39,6 +43,18 @@ export default function AccionesTurno({
               className="text-xs rounded-md border border-bosque-100 px-2 py-1 text-bosque-600 hover:border-bosque-400 disabled:opacity-60"
             >
               {marcando ? "Guardando…" : "Atendido"}
+            </button>
+          </form>
+        )}
+
+        {yaEmpezo && !confirmando && (
+          <form action={marcarAusente}>
+            <button
+              type="submit"
+              disabled={ocupado}
+              className="text-xs rounded-md border border-bosque-100 px-2 py-1 text-bosque-600 hover:border-arcilla-400 disabled:opacity-60"
+            >
+              {marcandoAusente ? "Guardando…" : "No vino"}
             </button>
           </form>
         )}

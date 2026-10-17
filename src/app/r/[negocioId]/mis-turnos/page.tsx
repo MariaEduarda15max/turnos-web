@@ -7,11 +7,20 @@ import CerrarSesionBoton from "@/components/CerrarSesionBoton";
 type TurnoCliente = {
   id: string;
   inicio: string;
-  estado: "confirmado" | "cancelado" | "completado";
+  estado: "confirmado" | "cancelado" | "completado" | "ausente";
   token_acceso: string;
   // Puede venir null si RLS no deja leer el servicio (ver 0004): nunca
   // asumir que el join trae datos.
   servicios: { nombre: string } | null;
+};
+
+type PedidoCliente = {
+  id: string;
+  descripcion: string;
+  estado: "pendiente" | "listo" | "entregado";
+  creado_en: string;
+  listo_en: string | null;
+  entregado_en: string | null;
 };
 
 const nombreServicio = (t: TurnoCliente) => t.servicios?.nombre ?? "Servicio";
@@ -24,7 +33,13 @@ const cuando = (t: TurnoCliente) => {
 // Un turno "confirmado" que ya pasó no se marcó como atendido: se muestra
 // como "Pasado" en vez de un "Confirmado" que confunde.
 const etiquetaHistorial = (estado: TurnoCliente["estado"]) =>
-  estado === "cancelado" ? "Cancelado" : estado === "completado" ? "Atendido" : "Pasado";
+  estado === "cancelado"
+    ? "Cancelado"
+    : estado === "completado"
+      ? "Atendido"
+      : estado === "ausente"
+        ? "No asististe"
+        : "Pasado";
 
 export default async function MisTurnosPage({
   params,
@@ -46,6 +61,20 @@ export default async function MisTurnosPage({
     .select("id, inicio, estado, token_acceso, servicios(nombre)")
     .eq("negocio_id", negocioId)
     .order("inicio", { ascending: true });
+
+  // Pedidos de la cuenta en este negocio. RLS ("cliente con cuenta ve sus
+  // propios pedidos") ya limita a los suyos. Los entregados se muestran
+  // solo 30 días.
+  const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: pedidosData } = await supabase
+    .from("pedidos")
+    .select("id, descripcion, estado, creado_en, listo_en, entregado_en")
+    .eq("negocio_id", negocioId)
+    // Comillas: el timestamp lleva "." y ":", que el filtro or() de
+    // PostgREST podría interpretar como separadores.
+    .or(`estado.neq.entregado,entregado_en.gte."${hace30Dias}"`)
+    .order("creado_en", { ascending: false });
+  const pedidos = (pedidosData ?? []) as unknown as PedidoCliente[];
 
   // Próximos: confirmados que todavía no empezaron (del más cercano al más
   // lejano). Todo lo demás —pasados, atendidos, cancelados— va al
@@ -72,6 +101,28 @@ export default async function MisTurnosPage({
       >
         + Reservar un turno
       </Link>
+
+      {pedidos.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-bosque-800 font-medium mb-2">Mis pedidos</h2>
+          <ul className="space-y-2">
+            {pedidos.map((p) => (
+              <li key={p.id} className="rounded-lg border border-bosque-100 bg-white px-4 py-3">
+                <p className="text-bosque-800">{p.descripcion}</p>
+                <p
+                  className={`text-sm ${
+                    p.estado === "listo" ? "text-arcilla-600 font-medium" : "text-bosque-600"
+                  }`}
+                >
+                  {p.estado === "pendiente" && "En preparación"}
+                  {p.estado === "listo" && "¡Listo para retirar!"}
+                  {p.estado === "entregado" && "Entregado"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {(!turnos || turnos.length === 0) && (
         <p className="text-bosque-500 text-sm">Todavía no tenés turnos acá.</p>

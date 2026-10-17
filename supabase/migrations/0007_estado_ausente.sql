@@ -1,0 +1,11 @@
+-- turnos-web · Estado "ausente" ("no vino") para los turnos
+--
+-- Hasta ahora un turno pasado solo podía quedar confirmado, cancelado o
+-- completado ("atendido"). Sin "ausente" no hay forma de distinguir a
+-- quien no se presentó, y eso es justo lo que un negocio quiere ver
+-- (clientes que faltan seguido).
+--
+-- No afecta al anti-solapamiento: la exclusion constraint de turnos solo
+-- mira estado = 'confirmado', así que un turno "ausente" no bloquea el
+-- horario (igual que uno cancelado o completado).
+alter type estado_turno add value if not exists 'ausente';

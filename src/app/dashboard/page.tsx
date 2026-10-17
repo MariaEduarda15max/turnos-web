@@ -62,6 +62,12 @@ export default async function DashboardPage() {
           Turnos
         </Link>
         <Link
+          href="/dashboard/pedidos"
+          className="rounded-md border border-bosque-100 bg-white px-4 py-2 text-sm text-bosque-700 hover:border-bosque-400 transition-colors"
+        >
+          Pedidos
+        </Link>
+        <Link
           href="/dashboard/servicios"
           className="rounded-md border border-bosque-100 bg-white px-4 py-2 text-sm text-bosque-700 hover:border-bosque-400 transition-colors"
         >
@@ -75,9 +81,6 @@ export default async function DashboardPage() {
         </Link>
       </nav>
 
-      <p className="text-bosque-500 text-sm mt-4">
-        Pedidos — próximo paso.
-      </p>
     </main>
   );
 }
