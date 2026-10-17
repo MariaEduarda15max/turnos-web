@@ -51,6 +51,11 @@ export default async function DashboardPage() {
               /r/{negocio.id}
             </Link>
           </p>
+          <p className="pt-2">
+            <Link href="/dashboard/negocio" className="text-sm text-arcilla-600 hover:underline">
+              Editar datos del negocio
+            </Link>
+          </p>
         </div>
       )}
 
