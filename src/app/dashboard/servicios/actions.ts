@@ -2,6 +2,7 @@
 
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { leerMonto } from "@/lib/dinero";
 
 export type EstadoAccion = { error: string | null };
 
@@ -36,10 +37,16 @@ export async function crearServicio(
     return { error: "Nombre y duración son obligatorios." };
   }
 
+  const precio = leerMonto(formData.get("precio"));
+  if (Number.isNaN(precio) || (precio !== null && precio < 0)) {
+    return { error: "El precio no es un número válido." };
+  }
+
   const { error } = await supabase.from("servicios").insert({
     negocio_id: negocio.id,
     nombre,
     duracion_min,
+    precio,
   });
 
   if (error) return { error: error.message };
@@ -85,6 +92,34 @@ export async function borrarServicio(
     }
     return { error: error.message };
   }
+
+  revalidatePath("/dashboard/servicios");
+  return { error: null };
+}
+// Cambia (o borra, si queda vacío) el precio de un servicio.
+export async function actualizarPrecio(
+  servicioId: string,
+  _estadoPrevio: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const precio = leerMonto(formData.get("precio"));
+  if (Number.isNaN(precio) || (precio !== null && precio < 0)) {
+    return { error: "El precio no es un número válido." };
+  }
+
+  const supabase = await crearClienteServidor();
+  const { data: negocio } = await supabase.from("negocios").select("id").single();
+  if (!negocio) return { error: "No se encontró el negocio de esta cuenta." };
+
+  const { data, error } = await supabase
+    .from("servicios")
+    .update({ precio })
+    .eq("id", servicioId)
+    .eq("negocio_id", negocio.id)
+    .select("id");
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "No se encontró el servicio." };
 
   revalidatePath("/dashboard/servicios");
   return { error: null };

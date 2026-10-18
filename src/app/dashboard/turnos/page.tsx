@@ -8,13 +8,15 @@ import {
   horaMontevideo,
 } from "@/lib/fechas";
 import AccionesTurno from "./AccionesTurno";
+import PanelPagos from "../pagos/PanelPagos";
+import type { PagoResumen } from "@/lib/dinero";
 
 type Turno = {
   id: string;
   inicio: string;
   duracion_min: number;
   estado: "confirmado" | "cancelado" | "completado" | "ausente";
-  servicios: { nombre: string } | null;
+  servicios: { nombre: string; precio: number | string | null } | null;
   clientes: { nombre: string; email: string | null; telefono: string | null } | null;
 };
 
@@ -50,7 +52,7 @@ export default async function TurnosPage({
   let consulta = supabase
     .from("turnos")
     .select(
-      "id, inicio, duracion_min, estado, servicios(nombre), clientes(nombre, email, telefono)",
+      "id, inicio, duracion_min, estado, servicios(nombre, precio), clientes(nombre, email, telefono)",
     )
     .eq("negocio_id", negocio.id)
     .limit(300);
@@ -64,6 +66,21 @@ export default async function TurnosPage({
 
   const { data, error } = await consulta;
   const turnos = (data ?? []) as unknown as Turno[];
+
+  // Pagos aprobados de estos turnos, agrupados por turno.
+  const pagosPorTurno = new Map<string, PagoResumen[]>();
+  if (turnos.length > 0) {
+    const { data: pagos } = await supabase
+      .from("pagos")
+      .select("id, turno_id, monto, metodo, nota, creado_en")
+      .in("turno_id", turnos.map((t) => t.id))
+      .eq("estado", "aprobado")
+      .order("creado_en");
+    for (const p of (pagos ?? []) as (PagoResumen & { turno_id: string })[]) {
+      if (!pagosPorTurno.has(p.turno_id)) pagosPorTurno.set(p.turno_id, []);
+      pagosPorTurno.get(p.turno_id)!.push(p);
+    }
+  }
 
   // Agrupar por día (de Montevideo) manteniendo el orden de la consulta.
   const porDia = new Map<string, Turno[]>();
@@ -131,6 +148,15 @@ export default async function TurnosPage({
                       </p>
                       <p className="text-bosque-600 text-sm">{t.clientes?.nombre ?? "Cliente"}</p>
                       {contacto && <p className="text-bosque-400 text-xs break-all">{contacto}</p>}
+                      {/* Pagos: no en los cancelados sin pagos (no hay nada que cobrar). */}
+                      {(t.estado !== "cancelado" || pagosPorTurno.has(t.id)) && (
+                        <PanelPagos
+                          tipo="turno"
+                          destinoId={t.id}
+                          pagos={pagosPorTurno.get(t.id) ?? []}
+                          total={t.servicios?.precio ?? null}
+                        />
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <span className={`text-xs rounded-full px-2 py-0.5 ${etiqueta.clase}`}>

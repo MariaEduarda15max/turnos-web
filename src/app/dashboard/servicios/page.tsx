@@ -4,6 +4,7 @@ import Link from "next/link";
 import { alternarActivo } from "./actions";
 import FormularioAgregarServicio from "./FormularioAgregarServicio";
 import BotonBorrarServicio from "./BotonBorrarServicio";
+import PrecioServicio from "./PrecioServicio";
 
 export default async function ServiciosPage() {
   const supabase = await crearClienteServidor();
@@ -22,7 +23,7 @@ export default async function ServiciosPage() {
   // ver" ya no equivale a "los servicios de mi negocio".
   const { data: servicios } = await supabase
     .from("servicios")
-    .select("id, nombre, duracion_min, activo")
+    .select("id, nombre, duracion_min, activo, precio")
     .eq("negocio_id", negocio.id)
     .order("nombre");
 
@@ -48,7 +49,10 @@ export default async function ServiciosPage() {
           >
             <div>
               <p className="text-bosque-800">{servicio.nombre}</p>
-              <p className="text-bosque-500 text-sm">{servicio.duracion_min} min</p>
+              <div className="flex items-center gap-2">
+                <p className="text-bosque-500 text-sm">{servicio.duracion_min} min ·</p>
+                <PrecioServicio servicioId={servicio.id} precio={servicio.precio} />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

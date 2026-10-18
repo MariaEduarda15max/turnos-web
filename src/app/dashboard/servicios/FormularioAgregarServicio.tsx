@@ -30,6 +30,12 @@ export default function FormularioAgregarServicio() {
           min={1}
           className="w-28 rounded-md border border-bosque-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bosque-400"
         />
+        <input
+          name="precio"
+          inputMode="decimal"
+          placeholder="Precio $"
+          className="w-28 rounded-md border border-bosque-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bosque-400"
+        />
         <button
           type="submit"
           disabled={cargando}

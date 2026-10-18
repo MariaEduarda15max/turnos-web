@@ -3,6 +3,7 @@ import { diaMontevideo, formatearFecha, horaMontevideo } from "@/lib/fechas";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import CerrarSesionBoton from "@/components/CerrarSesionBoton";
+import { formatearMonto } from "@/lib/dinero";
 
 type TurnoCliente = {
   id: string;
@@ -11,7 +12,7 @@ type TurnoCliente = {
   token_acceso: string;
   // Puede venir null si RLS no deja leer el servicio (ver 0004): nunca
   // asumir que el join trae datos.
-  servicios: { nombre: string } | null;
+  servicios: { nombre: string; precio: number | string | null } | null;
 };
 
 type PedidoCliente = {
@@ -21,6 +22,7 @@ type PedidoCliente = {
   creado_en: string;
   listo_en: string | null;
   entregado_en: string | null;
+  monto: number | string | null;
 };
 
 const nombreServicio = (t: TurnoCliente) => t.servicios?.nombre ?? "Servicio";
@@ -58,7 +60,7 @@ export default async function MisTurnosPage({
   // aparecerían mezclados en esta pantalla).
   const { data: turnos } = await supabase
     .from("turnos")
-    .select("id, inicio, estado, token_acceso, servicios(nombre)")
+    .select("id, inicio, estado, token_acceso, servicios(nombre, precio)")
     .eq("negocio_id", negocioId)
     .order("inicio", { ascending: true });
 
@@ -68,7 +70,7 @@ export default async function MisTurnosPage({
   const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: pedidosData } = await supabase
     .from("pedidos")
-    .select("id, descripcion, estado, creado_en, listo_en, entregado_en")
+    .select("id, descripcion, estado, creado_en, listo_en, entregado_en, monto")
     .eq("negocio_id", negocioId)
     // Comillas: el timestamp lleva "." y ":", que el filtro or() de
     // PostgREST podría interpretar como separadores.
@@ -87,6 +89,39 @@ export default async function MisTurnosPage({
   const anteriores = lista
     .filter((t) => !proximos.includes(t))
     .reverse();
+
+  // Pagos (aprobados) de sus turnos y pedidos. RLS ("cliente ve pagos de
+  // sus turnos y pedidos", 0009) ya limita a los suyos.
+  const pagadoPor = new Map<string, number>();
+  // Solo se arman los filtros que tienen ids (un "in.()" vacío falla).
+  const filtros = [
+    lista.length > 0 ? `turno_id.in.(${lista.map((t) => t.id).join(",")})` : null,
+    pedidos.length > 0 ? `pedido_id.in.(${pedidos.map((p) => p.id).join(",")})` : null,
+  ].filter(Boolean);
+  if (filtros.length > 0) {
+    const { data: pagos } = await supabase
+      .from("pagos")
+      .select("turno_id, pedido_id, monto")
+      .eq("estado", "aprobado")
+      .or(filtros.join(","));
+    for (const pago of pagos ?? []) {
+      const clave = (pago.turno_id ?? pago.pedido_id) as string;
+      pagadoPor.set(clave, (pagadoPor.get(clave) ?? 0) + Number(pago.monto));
+    }
+  }
+
+  // "Pagado", "Pagaste $X · falta $Y" o nada si no hay pagos ni precio.
+  const estadoPago = (id: string, total: number | string | null) => {
+    const pagado = pagadoPor.get(id) ?? 0;
+    const totalNum = total === null ? null : Number(total);
+    if (totalNum !== null && pagado >= totalNum && pagado > 0) return "Pagado";
+    if (pagado > 0) {
+      return totalNum !== null
+        ? `Pagaste ${formatearMonto(pagado)} · falta ${formatearMonto(totalNum - pagado)}`
+        : `Pagaste ${formatearMonto(pagado)}`;
+    }
+    return totalNum !== null ? `Precio ${formatearMonto(totalNum)}` : null;
+  };
 
   return (
     <main className="min-h-screen px-6 py-10 max-w-md mx-auto">
@@ -118,6 +153,9 @@ export default async function MisTurnosPage({
                   {p.estado === "listo" && "¡Listo para retirar!"}
                   {p.estado === "entregado" && "Entregado"}
                 </p>
+                {estadoPago(p.id, p.monto) && (
+                  <p className="text-bosque-500 text-xs mt-1">{estadoPago(p.id, p.monto)}</p>
+                )}
               </li>
             ))}
           </ul>
@@ -143,6 +181,9 @@ export default async function MisTurnosPage({
                 >
                   <p className="text-bosque-800">{nombreServicio(turno)}</p>
                   <p className="text-bosque-600 text-sm">{cuando(turno)}</p>
+                  {estadoPago(turno.id, turno.servicios?.precio ?? null) && (
+                    <p className="text-bosque-500 text-xs">{estadoPago(turno.id, turno.servicios?.precio ?? null)}</p>
+                  )}
                   <p className="text-arcilla-600 text-xs mt-1">Ver, cancelar o reprogramar →</p>
                 </Link>
               </li>

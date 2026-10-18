@@ -10,9 +10,11 @@ const estadoInicial: EstadoAccion = { error: null };
 export default function EditarBorrarPedido({
   pedidoId,
   descripcion,
+  monto,
 }: {
   pedidoId: string;
   descripcion: string;
+  monto: number | string | null;
 }) {
   const [modo, setModo] = useState<"normal" | "editando" | "borrando">("normal");
 
@@ -41,6 +43,13 @@ export default function EditarBorrarPedido({
           required
           autoFocus
           className="flex-1 min-w-48 rounded-md border border-bosque-100 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-bosque-400"
+        />
+        <input
+          name="monto"
+          inputMode="decimal"
+          placeholder="Precio $"
+          defaultValue={monto === null ? "" : String(monto)}
+          className="w-24 rounded-md border border-bosque-100 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-bosque-400"
         />
         <button
           type="submit"

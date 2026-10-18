@@ -5,6 +5,8 @@ import { diaMontevideo, formatearFecha, horaMontevideo } from "@/lib/fechas";
 import FormularioPedido from "./FormularioPedido";
 import AccionPedido from "./AccionPedido";
 import EditarBorrarPedido from "./EditarBorrarPedido";
+import PanelPagos from "../pagos/PanelPagos";
+import { formatearMonto, type PagoResumen } from "@/lib/dinero";
 
 type Pedido = {
   id: string;
@@ -13,6 +15,7 @@ type Pedido = {
   creado_en: string;
   listo_en: string | null;
   entregado_en: string | null;
+  monto: number | string | null;
   clientes: { nombre: string; email: string | null; telefono: string | null } | null;
 };
 
@@ -36,13 +39,13 @@ export default async function PedidosPage() {
   const [{ data: abiertos, error }, { data: entregados }] = await Promise.all([
     supabase
       .from("pedidos")
-      .select("id, descripcion, estado, creado_en, listo_en, entregado_en, clientes(nombre, email, telefono)")
+      .select("id, descripcion, estado, monto, creado_en, listo_en, entregado_en, clientes(nombre, email, telefono)")
       .eq("negocio_id", negocio.id)
       .in("estado", ["pendiente", "listo"])
       .order("creado_en", { ascending: true }),
     supabase
       .from("pedidos")
-      .select("id, descripcion, estado, creado_en, listo_en, entregado_en, clientes(nombre, email, telefono)")
+      .select("id, descripcion, estado, monto, creado_en, listo_en, entregado_en, clientes(nombre, email, telefono)")
       .eq("negocio_id", negocio.id)
       .eq("estado", "entregado")
       .gte("entregado_en", hace30Dias)
@@ -55,18 +58,43 @@ export default async function PedidosPage() {
   const listos = lista.filter((p) => p.estado === "listo");
   const historial = (entregados ?? []) as unknown as Pedido[];
 
+  // Pagos aprobados de todos los pedidos de la página, agrupados.
+  const todos = [...lista, ...historial];
+  const pagosPorPedido = new Map<string, PagoResumen[]>();
+  if (todos.length > 0) {
+    const { data: pagos } = await supabase
+      .from("pagos")
+      .select("id, pedido_id, monto, metodo, nota, creado_en")
+      .in("pedido_id", todos.map((p) => p.id))
+      .eq("estado", "aprobado")
+      .order("creado_en");
+    for (const pago of (pagos ?? []) as (PagoResumen & { pedido_id: string })[]) {
+      if (!pagosPorPedido.has(pago.pedido_id)) pagosPorPedido.set(pago.pedido_id, []);
+      pagosPorPedido.get(pago.pedido_id)!.push(pago);
+    }
+  }
+
   const tarjeta = (p: Pedido, detalle: string, siguiente?: "listo" | "entregado") => {
     const contacto = [p.clientes?.email, p.clientes?.telefono].filter(Boolean).join(" · ");
     return (
       <li key={p.id} className="flex items-start justify-between gap-4 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-bosque-800">{p.descripcion}</p>
+          <p className="text-bosque-800">
+            {p.descripcion}
+            {p.monto !== null && <span className="text-bosque-500 text-sm"> · {formatearMonto(p.monto)}</span>}
+          </p>
           <p className="text-bosque-600 text-sm">{p.clientes?.nombre ?? "Cliente"}</p>
           {contacto && <p className="text-bosque-400 text-xs break-all">{contacto}</p>}
           <p className="text-bosque-400 text-xs mt-1">{detalle}</p>
+          <PanelPagos
+            tipo="pedido"
+            destinoId={p.id}
+            pagos={pagosPorPedido.get(p.id) ?? []}
+            total={p.monto}
+          />
           {/* Los entregados quedan como historial: no se editan ni se borran. */}
           {p.estado !== "entregado" && (
-            <EditarBorrarPedido pedidoId={p.id} descripcion={p.descripcion} />
+            <EditarBorrarPedido pedidoId={p.id} descripcion={p.descripcion} monto={p.monto} />
           )}
         </div>
         {siguiente && <AccionPedido pedidoId={p.id} siguiente={siguiente} />}

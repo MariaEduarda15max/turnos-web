@@ -21,6 +21,12 @@ export default function FormularioPedido() {
         placeholder="Qué es (ej. Pantalón con ruedo)"
         className={`${input} w-full`}
       />
+      <input
+        name="monto"
+        inputMode="decimal"
+        placeholder="Precio en $ (opcional)"
+        className={`${input} w-48`}
+      />
       <div className="flex flex-wrap gap-3">
         <input name="nombre" type="text" required placeholder="Nombre del cliente" className={`${input} flex-1 min-w-40`} />
         <input name="email" type="email" placeholder="Email" className={`${input} flex-1 min-w-40`} />

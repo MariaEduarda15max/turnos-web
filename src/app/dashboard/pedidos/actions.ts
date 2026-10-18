@@ -2,6 +2,7 @@
 
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { leerMonto } from "@/lib/dinero";
 
 export type EstadoAccion = { error: string | null };
 
@@ -32,6 +33,10 @@ export async function crearPedido(
   const telefono = String(formData.get("telefono") ?? "").trim();
 
   if (!descripcion) return { error: "Escribí qué es el pedido." };
+  const monto = leerMonto(formData.get("monto"));
+  if (Number.isNaN(monto) || (monto !== null && monto < 0)) {
+    return { error: "El precio no es un número válido." };
+  }
   if (!nombre || (!email && !telefono)) {
     return { error: "Nombre y (email o teléfono) del cliente son obligatorios." };
   }
@@ -63,6 +68,7 @@ export async function crearPedido(
     negocio_id: negocioId,
     cliente_id: clienteId,
     descripcion,
+    monto,
   });
   if (error) return { error: error.message };
 
@@ -112,13 +118,17 @@ export async function editarPedido(
 ): Promise<EstadoAccion> {
   const descripcion = String(formData.get("descripcion") ?? "").trim();
   if (!descripcion) return { error: "La descripción no puede quedar vacía." };
+  const monto = leerMonto(formData.get("monto"));
+  if (Number.isNaN(monto) || (monto !== null && monto < 0)) {
+    return { error: "El precio no es un número válido." };
+  }
 
   const { supabase, negocioId } = await obtenerNegocio();
   if (!negocioId) return { error: "No se encontró el negocio de esta cuenta." };
 
   const { data, error } = await supabase
     .from("pedidos")
-    .update({ descripcion })
+    .update({ descripcion, monto })
     .eq("id", pedidoId)
     .eq("negocio_id", negocioId)
     .select("id");
