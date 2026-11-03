@@ -15,7 +15,8 @@ type Turno = {
   id: string;
   inicio: string;
   duracion_min: number;
-  estado: "confirmado" | "cancelado" | "completado" | "ausente";
+  estado: "confirmado" | "cancelado" | "completado" | "ausente" | "pendiente_pago";
+  expira_en: string | null;
   servicios: { nombre: string; precio: number | string | null } | null;
   clientes: { nombre: string; email: string | null; telefono: string | null } | null;
 };
@@ -25,6 +26,7 @@ const ETIQUETA_ESTADO: Record<Turno["estado"], { texto: string; clase: string }>
   cancelado: { texto: "Cancelado", clase: "border border-arcilla-400 text-arcilla-600" },
   completado: { texto: "Atendido", clase: "bg-bosque-100 text-bosque-800" },
   ausente: { texto: "No vino", clase: "border border-bosque-400 text-bosque-600" },
+  pendiente_pago: { texto: "Esperando pago", clase: "border border-dashed border-bosque-400 text-bosque-600" },
 };
 
 export default async function TurnosPage({
@@ -52,7 +54,7 @@ export default async function TurnosPage({
   let consulta = supabase
     .from("turnos")
     .select(
-      "id, inicio, duracion_min, estado, servicios(nombre, precio), clientes(nombre, email, telefono)",
+      "id, inicio, duracion_min, estado, expira_en, servicios(nombre, precio), clientes(nombre, email, telefono)",
     )
     .eq("negocio_id", negocio.id)
     .limit(300);
@@ -69,16 +71,20 @@ export default async function TurnosPage({
 
   // Pagos aprobados de estos turnos, agrupados por turno.
   const pagosPorTurno = new Map<string, PagoResumen[]>();
+  // Pagos online que llegaron tarde o para un turno cancelado: hay que
+  // devolverlos a mano (registrar_pago_online los marca, 0011).
+  const turnosARevisar = new Set<string>();
   if (turnos.length > 0) {
     const { data: pagos } = await supabase
       .from("pagos")
-      .select("id, turno_id, monto, metodo, nota, creado_en")
+      .select("id, turno_id, monto, metodo, nota, creado_en, requiere_revision")
       .in("turno_id", turnos.map((t) => t.id))
       .eq("estado", "aprobado")
       .order("creado_en");
     for (const p of (pagos ?? []) as (PagoResumen & { turno_id: string })[]) {
       if (!pagosPorTurno.has(p.turno_id)) pagosPorTurno.set(p.turno_id, []);
       pagosPorTurno.get(p.turno_id)!.push(p);
+      if ((p as { requiere_revision?: boolean }).requiere_revision) turnosARevisar.add(p.turno_id);
     }
   }
 
@@ -130,7 +136,12 @@ export default async function TurnosPage({
               {delDia.map((t) => {
                 const inicio = new Date(t.inicio);
                 const fin = new Date(inicio.getTime() + t.duracion_min * 60_000);
-                const etiqueta = ETIQUETA_ESTADO[t.estado];
+                // Retención vencida que la limpieza todavía no pasó a cancelado.
+                const vencido =
+                  t.estado === "pendiente_pago" && !!t.expira_en && new Date(t.expira_en) <= ahora;
+                const etiqueta = vencido
+                  ? { texto: "Venció sin pago", clase: "border border-arcilla-400 text-arcilla-600" }
+                  : ETIQUETA_ESTADO[t.estado];
                 const contacto = [t.clientes?.email, t.clientes?.telefono].filter(Boolean).join(" · ");
                 return (
                   <li
@@ -148,6 +159,11 @@ export default async function TurnosPage({
                       </p>
                       <p className="text-bosque-600 text-sm">{t.clientes?.nombre ?? "Cliente"}</p>
                       {contacto && <p className="text-bosque-400 text-xs break-all">{contacto}</p>}
+                      {turnosARevisar.has(t.id) && (
+                        <p className="text-arcilla-600 text-xs font-medium mt-1">
+                          ⚠ Pago online para revisar: hay que devolverlo (ver la nota del pago).
+                        </p>
+                      )}
                       {/* Pagos: no en los cancelados sin pagos (no hay nada que cobrar). */}
                       {(t.estado !== "cancelado" || pagosPorTurno.has(t.id)) && (
                         <PanelPagos

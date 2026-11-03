@@ -48,9 +48,11 @@ export async function calcularHorariosLibres(
       (() => {
         let query = supabase
           .from("turnos")
-          .select("id, inicio, duracion_min")
+          .select("id, inicio, duracion_min, estado, expira_en")
           .eq("negocio_id", negocioId)
-          .eq("estado", "confirmado")
+          // Un turno esperando pago también ocupa el horario, mientras no
+          // venza su retención (se filtra abajo por expira_en).
+          .in("estado", ["confirmado", "pendiente_pago"])
           .gte("inicio", fechaMontevideo(dia, "00:00").toISOString())
           .lt("inicio", fechaMontevideo(dia, "23:59").toISOString());
         // Al reprogramar, el turno propio no debe bloquearse a sí mismo.
@@ -67,8 +69,11 @@ export async function calcularHorariosLibres(
   if (!servicio || !franjas) return [];
   const duracion = servicio.duracion_min;
 
+  const ahora = Date.now();
   const ocupados = [
-    ...(turnosDelDia ?? []).map((t) => ({
+    ...(turnosDelDia ?? [])
+      .filter((t) => t.estado === "confirmado" || (t.expira_en && new Date(t.expira_en).getTime() > ahora))
+      .map((t) => ({
       desde: new Date(t.inicio),
       hasta: new Date(new Date(t.inicio).getTime() + t.duracion_min * 60_000),
     })),

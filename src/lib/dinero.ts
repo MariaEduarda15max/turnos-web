@@ -41,3 +41,26 @@ export function resumirPagos(pagos: PagoResumen[], total: number | string | null
   const falta = totalNum === null ? null : Math.max(0, Math.round((totalNum - pagado) * 100) / 100);
   return { pagado, total: totalNum, falta };
 }
+
+// ── Cobro online (etapa 2) ──────────────────────────────────────────────
+export type ConfigCobro = {
+  cobro_modo: "no_cobrar" | "sena" | "total";
+  sena_tipo: "porcentaje" | "monto" | null;
+  sena_valor: number | string | null;
+};
+
+const redondear = (n: number) => Math.round(n * 100) / 100;
+
+// Cuánto cobrar online al reservar. null = no se cobra (y el turno se
+// confirma directo). Total y seña en % necesitan que el servicio tenga
+// precio; la seña de monto fijo no (si hay precio, no lo supera).
+export function montoACobrar(config: ConfigCobro, precio: number | string | null): number | null {
+  if (config.cobro_modo === "no_cobrar") return null;
+  const p = precio === null || precio === undefined ? null : Number(precio);
+  if (config.cobro_modo === "total") return p && p > 0 ? redondear(p) : null;
+
+  const valor = Number(config.sena_valor);
+  if (!valor || valor <= 0) return null;
+  if (config.sena_tipo === "porcentaje") return p && p > 0 ? redondear((p * valor) / 100) : null;
+  return redondear(p && p > 0 ? Math.min(valor, p) : valor);
+}

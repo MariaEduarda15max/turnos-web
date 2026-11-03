@@ -3,10 +3,19 @@
 import { crearClientePublico } from "@/lib/supabase/publico";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esHoraValida, fechaMontevideo } from "@/lib/fechas";
+import { cobroOnline, crearPreferencia, SITIO_URL, tokenDelNegocio } from "@/lib/mp";
 
-export type EstadoReserva = { error: string | null; tokenAcceso: string | null };
+export type EstadoReserva = {
+  error: string | null;
+  tokenAcceso: string | null;
+  // Si hay que pagar: a dónde mandar al cliente (Checkout Pro de MP).
+  linkPago: string | null;
+};
 
-const estadoInicial: EstadoReserva = { error: null, tokenAcceso: null };
+const estadoInicial: EstadoReserva = { error: null, tokenAcceso: null, linkPago: null };
+
+// Cuánto tiempo se retiene el horario mientras el cliente paga.
+const MINUTOS_RETENCION = 15;
 
 export async function reservarTurno(
   _estadoPrevio: EstadoReserva,
@@ -96,6 +105,14 @@ export async function reservarTurno(
 
   const inicio = fechaMontevideo(dia, hora);
 
+  // Libera las reservas de otros que vencieron sin pagar: si no, seguirían
+  // bloqueando el horario hasta que alguien las limpie (0011_cobro_online).
+  await supabase.rpc("liberar_turnos_vencidos", { negocio_id_param: negocioId });
+
+  // ¿Se cobra online? Se calcula de nuevo acá (no se confía en el form).
+  const cobro = await cobroOnline(negocioId, servicioId);
+  const venceEn = new Date(Date.now() + MINUTOS_RETENCION * 60_000);
+
   const { data: turno, error: errorTurno } = await supabase
     .from("turnos")
     .insert({
@@ -104,8 +121,9 @@ export async function reservarTurno(
       servicio_id: servicioId,
       inicio: inicio.toISOString(),
       duracion_min: servicio.duracion_min,
+      ...(cobro ? { estado: "pendiente_pago", expira_en: venceEn.toISOString() } : {}),
     })
-    .select("token_acceso")
+    .select("id, token_acceso")
     .single();
 
   if (errorTurno || !turno) {
@@ -121,5 +139,34 @@ export async function reservarTurno(
     return { ...estadoInicial, error: errorTurno?.message ?? "No se pudo reservar el turno." };
   }
 
-  return { error: null, tokenAcceso: turno.token_acceso };
+  if (!cobro) return { error: null, tokenAcceso: turno.token_acceso, linkPago: null };
+
+  // Hay que cobrar: preferencia de Checkout Pro con el token DEL NEGOCIO
+  // (la plata va a su cuenta). Si MP falla, se borra la reserva retenida
+  // para no dejar el horario bloqueado 15 minutos por nada.
+  try {
+    const token = await tokenDelNegocio(negocioId);
+    if (!token) throw new Error("El negocio no tiene Mercado Pago conectado");
+
+    const preferencia = await crearPreferencia(token.accessToken, {
+      negocioId,
+      turnoId: turno.id,
+      titulo: `${cobro.esSena ? "Seña · " : ""}${cobro.servicioNombre} · ${cobro.negocioNombre}`.slice(0, 250),
+      monto: cobro.monto,
+      emailPagador: email || null,
+      venceEn,
+      urlVuelta: `${SITIO_URL}/r/${negocioId}/turno/${turno.token_acceso}`,
+    });
+
+    await supabase
+      .from("turnos")
+      .update({ mp_preferencia_id: preferencia.id, link_pago: preferencia.linkPago })
+      .eq("id", turno.id);
+
+    return { error: null, tokenAcceso: turno.token_acceso, linkPago: preferencia.linkPago };
+  } catch (e) {
+    console.error("[reserva] no se pudo crear el pago:", e instanceof Error ? e.message : e);
+    await supabase.from("turnos").delete().eq("id", turno.id).eq("estado", "pendiente_pago");
+    return { ...estadoInicial, error: "No se pudo iniciar el pago. Probá de nuevo en un momento." };
+  }
 }

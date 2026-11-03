@@ -1,6 +1,7 @@
 import { crearClientePublico } from "@/lib/supabase/publico";
 import { formatearFecha } from "@/lib/fechas";
 import { calcularHorariosLibres, diasConDisponibilidad } from "@/lib/slots";
+import { cobroOnline } from "@/lib/mp";
 import FormularioReserva from "./FormularioReserva";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -94,7 +95,10 @@ export default async function ReservarPage({ params, searchParams }: Props) {
   }
 
   // --- Paso 3: día elegido → calcular horarios libres y reservar --------
-  const horarios = await calcularHorariosLibres(supabase, negocioId, servicioId, dia);
+  const [horarios, cobro] = await Promise.all([
+    calcularHorariosLibres(supabase, negocioId, servicioId, dia),
+    cobroOnline(negocioId, servicioId),
+  ]);
 
   return (
     <Layout negocioNombre={negocio.nombre} paso={3} servicioNombre={servicio.nombre} negocioId={negocioId}>
@@ -104,6 +108,7 @@ export default async function ReservarPage({ params, searchParams }: Props) {
         servicioId={servicioId}
         dia={dia}
         horarios={horarios}
+        cobro={cobro ? { monto: cobro.monto, esSena: cobro.esSena } : null}
       />
     </Layout>
   );

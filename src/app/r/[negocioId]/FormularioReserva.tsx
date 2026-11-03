@@ -1,23 +1,53 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { reservarTurno, type EstadoReserva } from "./actions";
+import { formatearMonto } from "@/lib/dinero";
 
-const estadoInicial: EstadoReserva = { error: null, tokenAcceso: null };
+const estadoInicial: EstadoReserva = { error: null, tokenAcceso: null, linkPago: null };
 
 export default function FormularioReserva({
   negocioId,
   servicioId,
   dia,
   horarios,
+  cobro,
 }: {
   negocioId: string;
   servicioId: string;
   dia: string;
   horarios: string[];
+  // Si el negocio cobra online al reservar (seña o total), cuánto.
+  cobro: { monto: number; esSena: boolean } | null;
 }) {
   const [estado, accion, cargando] = useActionState(reservarTurno, estadoInicial);
   const [horaElegida, setHoraElegida] = useState<string | null>(null);
+
+  // Reserva retenida: directo a pagar en Mercado Pago.
+  useEffect(() => {
+    if (estado.linkPago) window.location.assign(estado.linkPago);
+  }, [estado.linkPago]);
+
+  if (estado.linkPago && estado.tokenAcceso) {
+    return (
+      <div className="rounded-lg border border-bosque-100 bg-white p-5 space-y-3">
+        <p className="text-bosque-800">Te estamos llevando a Mercado Pago…</p>
+        <p className="text-bosque-600 text-sm">
+          Guardamos el horario por 15 minutos. Si no se abre solo,{" "}
+          <a href={estado.linkPago} className="text-arcilla-600 hover:underline">
+            tocá acá para pagar
+          </a>
+          .
+        </p>
+        <p className="text-bosque-500 text-xs">
+          Tu turno:{" "}
+          <a href={`/r/${negocioId}/turno/${estado.tokenAcceso}`} className="hover:underline break-all">
+            /r/{negocioId}/turno/{estado.tokenAcceso}
+          </a>
+        </p>
+      </div>
+    );
+  }
 
   // Si la reserva se confirmó, mostramos el link de "mi turno" en vez del
   // formulario — ese token_acceso es lo que le permite a alguien sin
@@ -89,12 +119,22 @@ export default function FormularioReserva({
             placeholder="Teléfono (si no dejás email)"
             className="w-full rounded-md border border-bosque-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bosque-400"
           />
+          {cobro && (
+            <p className="text-bosque-600 text-sm">
+              Para confirmar el turno se paga {cobro.esSena ? "una seña de " : ""}
+              <strong>{formatearMonto(cobro.monto)}</strong> con Mercado Pago.
+            </p>
+          )}
           <button
             type="submit"
             disabled={cargando}
             className="w-full rounded-md bg-bosque-800 text-white py-2 text-sm font-medium hover:bg-bosque-900 transition-colors disabled:opacity-60"
           >
-            {cargando ? "Confirmando…" : `Confirmar ${horaElegida}`}
+            {cargando
+              ? "Confirmando…"
+              : cobro
+                ? `Reservar ${horaElegida} y pagar`
+                : `Confirmar ${horaElegida}`}
           </button>
         </div>
       )}

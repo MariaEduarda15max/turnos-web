@@ -84,6 +84,12 @@ export default async function DashboardPage() {
         >
           Horarios
         </Link>
+        <Link
+          href="/dashboard/cobros"
+          className="rounded-md border border-bosque-100 bg-white px-4 py-2 text-sm text-bosque-700 hover:border-bosque-400 transition-colors"
+        >
+          Cobros
+        </Link>
       </nav>
 
     </main>

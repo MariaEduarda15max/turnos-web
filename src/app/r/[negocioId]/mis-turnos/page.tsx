@@ -8,7 +8,7 @@ import { formatearMonto } from "@/lib/dinero";
 type TurnoCliente = {
   id: string;
   inicio: string;
-  estado: "confirmado" | "cancelado" | "completado" | "ausente";
+  estado: "confirmado" | "cancelado" | "completado" | "ausente" | "pendiente_pago";
   token_acceso: string;
   // Puede venir null si RLS no deja leer el servicio (ver 0004): nunca
   // asumir que el join trae datos.
@@ -41,7 +41,9 @@ const etiquetaHistorial = (estado: TurnoCliente["estado"]) =>
       ? "Atendido"
       : estado === "ausente"
         ? "No asististe"
-        : "Pasado";
+        : estado === "pendiente_pago"
+          ? "Pago sin completar"
+          : "Pasado";
 
 export default async function MisTurnosPage({
   params,
@@ -84,7 +86,9 @@ export default async function MisTurnosPage({
   const ahora = Date.now();
   const lista = (turnos ?? []) as unknown as TurnoCliente[];
   const proximos = lista.filter(
-    (t) => t.estado === "confirmado" && new Date(t.inicio).getTime() >= ahora,
+    // Un turno esperando pago también es "próximo": en el detalle está el
+    // botón para pagar (y si la retención venció, lo explica).
+    (t) => (t.estado === "confirmado" || t.estado === "pendiente_pago") && new Date(t.inicio).getTime() >= ahora,
   );
   const anteriores = lista
     .filter((t) => !proximos.includes(t))
@@ -184,7 +188,9 @@ export default async function MisTurnosPage({
                   {estadoPago(turno.id, turno.servicios?.precio ?? null) && (
                     <p className="text-bosque-500 text-xs">{estadoPago(turno.id, turno.servicios?.precio ?? null)}</p>
                   )}
-                  <p className="text-arcilla-600 text-xs mt-1">Ver, cancelar o reprogramar →</p>
+                  <p className="text-arcilla-600 text-xs mt-1">
+                    {turno.estado === "pendiente_pago" ? "Falta el pago → ver turno" : "Ver, cancelar o reprogramar →"}
+                  </p>
                 </Link>
               </li>
             ))}
