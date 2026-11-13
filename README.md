@@ -1,179 +1,110 @@
 # turnos-web
 
-Aplicación web de gestión de turnos, multi-negocio (multi-tenant). Evolución
-del [bot de Telegram `turnos-bot`](https://github.com/MariaEduarda15max/turnos-bot)
-hacia una web app real: panel del negocio con login, y — próximamente —
-reserva pública para clientes sin necesidad de cuenta.
+Aplicación web **multi-negocio** para gestionar turnos, pedidos y cobros. Cada negocio tiene su panel y un link de reservas para sus clientes. Los clientes pueden reservar como invitados o con cuenta, y pagar una seña con Mercado Pago.
 
-## Estado del proyecto
+Es la evolución de mi bot de Telegram [`turnos-bot`](https://github.com/MariaEduarda15max/turnos-bot): pasa de un solo negocio a una plataforma que sirve a varios, con aislamiento de datos a nivel de base de datos.
 
-- [x] Backend en Supabase: 7 tablas, multi-negocio, Row Level Security
-- [x] Auth del negocio (registro + login con Supabase Auth)
-- [x] Dashboard protegido, con aislamiento real entre negocios (RLS, no solo
-      lógica de frontend)
-- [x] Gestión de Servicios (crear, activar/desactivar, borrar)
-- [x] Gestión de Disponibilidad/Horarios, con anti-solape de franjas
-- [x] Reserva pública de turnos (sin cuenta), con horarios calculados en
-      tiempo real y anti-doble-reserva
-- [x] Ver/cancelar/reprogramar un turno vía link con token, sin cuenta
-- [ ] "Mis turnos" para clientes con cuenta (fusión de turnos de invitado)
-- [ ] Gestión de Pedidos
+**Demo:** https://turnos-web-liart.vercel.app
+
+> Proyecto de portfolio en desarrollo activo. El cobro online con Mercado Pago funciona en **modo prueba** (sandbox).
+
+---
+
+## Qué hace
+
+**Para el negocio** (panel con login):
+- **Agenda:** próximos turnos y los de los últimos 30 días. Se pueden marcar como *Atendido* o *No vino*, o cancelar.
+- **Servicios:** duración y precio, activos e inactivos.
+- **Horarios:** franjas por día de la semana y bloqueos puntuales (feriados, días libres).
+- **Pedidos:** se crean y avanzan de *en preparación* → *listo* → *entregado*, con fechas de cada paso.
+- **Pagos:** registro manual de pagos parciales o totales (efectivo, transferencia, etc.) en turnos y pedidos.
+- **Cobros online:** el negocio conecta su cuenta de Mercado Pago y elige si no cobra, si cobra una seña (porcentaje o monto fijo) o si cobra el total al reservar.
+
+**Para el cliente** (página pública `/r/<negocio>`):
+- Reserva en tres pasos: servicio, día y horario. Los horarios libres se calculan en tiempo real.
+- Puede reservar **sin cuenta**: recibe un link privado para ver, cancelar o reprogramar ese turno.
+- O puede **crearse una cuenta** con email confirmado para ver todos sus turnos y pedidos en "Mis turnos", con su estado de pago.
+- Si el negocio cobra seña, el horario queda **retenido 15 minutos** mientras el cliente paga en Mercado Pago.
+
+## Lo técnico que vale la pena mirar
+
+- **Multi-tenant con Row Level Security.** Todas las tablas llevan `negocio_id`, y las políticas de RLS de Postgres garantizan que un negocio no pueda leer ni escribir datos de otro. El control está en la base de datos, no en el frontend.
+- **Anti doble reserva en la base.** Una *exclusion constraint* (`btree_gist` + rangos de tiempo) impide que dos turnos se superpongan, aunque dos personas confirmen en el mismo instante. Las reservas que esperan pago también bloquean el horario hasta que vencen.
+- **Lo público no abre la base al público.** La página de reservas no usa políticas de RLS abiertas. Se calcula en el servidor y expone solo los horarios libres, nunca filas con datos de clientes.
+- **Acceso por token** para clientes sin cuenta. Si después se crean una cuenta (con email verificado), sus reservas de invitado se vinculan a ella mediante una función `security definer`.
+- **Mercado Pago como marketplace:**
+  - **OAuth con PKCE:** cada negocio conecta *su* cuenta y la plata va directo a ella.
+  - **Tokens protegidos:** se guardan cifrados con AES-256-GCM, en una tabla sin políticas de RLS a la que solo accede el servidor.
+  - **Webhooks validados:** se verifica la firma HMAC y nunca se confía en el contenido del aviso. El pago se vuelve a consultar en la API de MP antes de registrarlo.
+  - **Registro idempotente:** el mismo aviso repetido no duplica pagos.
+  - **Casos borde resueltos en la base:** un pago que llega tarde, cuando el horario ya se ocupó, queda marcado para devolver.
+- **Fechas siempre en hora de Montevideo** y en formato de 24 h, sin depender de la zona horaria del servidor.
 
 ## Stack
 
-- [Next.js 16](https://nextjs.org) (App Router, Server Components, Server Actions)
-- [Supabase](https://supabase.com) — Postgres, Auth, Row Level Security
-- [Tailwind CSS](https://tailwindcss.com)
-- TypeScript
-
-## Por qué existe un backend separado del bot
-
-`turnos-bot` asume un solo negocio. Acá el modelo de datos es **multi-tenant**:
-todas las tablas llevan `negocio_id`, y las políticas de RLS garantizan —a
-nivel de base de datos, no solo de código— que un negocio nunca pueda leer o
-escribir datos de otro. Por eso corre en su propio proyecto de Supabase, no
-comparte base con el bot.
-
-## Setup
-
-### 1. Instalar dependencias
-
-```bash
-npm install
-```
-
-### 2. Crear el proyecto en Supabase
-
-Uno nuevo, separado del de `turnos-bot` — así los datos de portfolio/demo no
-se mezclan con datos de negocios reales interesados.
-
-### 3. Aplicar la migración
-
-```bash
-npm install supabase --save-dev   # si no está ya
-npx supabase login
-npx supabase link --project-ref TU_PROJECT_REF
-npx supabase db push
-```
-
-> ⚠️ `npm install -g supabase` está deprecado por Supabase y falla a
-> propósito — usar siempre `npx supabase ...`.
-
-### 4. Variables de entorno
-
-```bash
-cp .env.local.example .env.local
-```
-
-Completar con los valores reales del proyecto (Dashboard → Settings → API
-Keys):
-
-| Variable | De dónde sale |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | "Project URL" — formato corto `https://xxxxx.supabase.co`, **no** el link del dashboard |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | "Publishable key", empieza con `sb_publishable_...` |
-
-### 5. Desactivar confirmación de email (solo para desarrollo)
-
-Dashboard → **Authentication → Sign In / Providers → Email** → desactivar
-"Confirm email" → **guardar el cambio explícitamente** (el toggle puede
-verse activado visualmente sin haber persistido).
-
-Sin este paso, el registro crea el usuario pero no da sesión activa hasta
-confirmar el email — y como el `insert` en `negocios` corre en el mismo paso
-que el registro, falla con "violates row-level security policy" (no hay
-`auth.uid()` todavía).
-
-### 6. Correr
-
-```bash
-npm run dev
-```
-
-`http://localhost:3000` redirige a `/login` o `/dashboard` según haya sesión.
+- [Next.js 16](https://nextjs.org): App Router, Server Components y Server Actions (`useActionState`).
+- [Supabase](https://supabase.com): Postgres, Auth con confirmación por email y Row Level Security.
+- [Mercado Pago](https://www.mercadopago.com.uy/developers): Checkout Pro, OAuth y webhooks.
+- [Tailwind CSS](https://tailwindcss.com) y TypeScript.
+- Desplegado en [Vercel](https://vercel.com).
 
 ## Estructura
 
 ```
 src/
-  proxy.ts                        # refresca la sesión en cada request (ver nota abajo)
+  proxy.ts                 # refresca la sesión en cada request (Next 16: proxy.ts en vez de middleware.ts)
   lib/
-    fechas.ts                     # zona horaria fija, mismo patrón que turnos-bot
-    slots.ts                      # cálculo de horarios libres, compartido
-    supabase/
-      client.ts                   # Client Components (navegador)
-      server.ts                   # Server Components/Actions autenticados
-      publico.ts                  # secret key, SOLO server-side, para la reserva pública
+    supabase/              # clientes: navegador, servidor con sesión y servidor con secret key
+    slots.ts               # cálculo de horarios libres
+    fechas.ts              # fechas en hora de Montevideo
+    dinero.ts              # montos, pagos y cálculo de la seña
+    mp.ts                  # Mercado Pago: cifrado, OAuth/PKCE, preferencias y firma de webhooks
   app/
-    login/page.tsx
-    registro/page.tsx
-    dashboard/
-      page.tsx                    # panel principal, protegido
-      CerrarSesionBoton.tsx
-      servicios/
-        page.tsx
-        actions.ts                 # Server Actions: crear/activar/borrar
-        FormularioAgregarServicio.tsx
-        BotonBorrarServicio.tsx
-      horarios/                    # disponibilidad, con anti-solape
-    r/
-      [negocioId]/                 # reserva pública — sin login
-        page.tsx                   # elegir servicio → día → horario → confirmar
-        actions.ts
-        FormularioReserva.tsx
-        turno/
-          [token]/                 # ver/cancelar/reprogramar por link, sin cuenta
-            page.tsx
-            actions.ts
-            BotonCancelar.tsx
-            FormularioReprogramar.tsx
-supabase/
-  migrations/
-    0001_init.sql                 # schema completo: tablas, RLS, funciones
-    0002_disponibilidad_sin_solapes.sql
+    login/, registro/      # acceso del negocio
+    dashboard/             # panel: turnos, servicios, horarios, pedidos, pagos, cobros, negocio
+    r/[negocioId]/         # reserva pública, cuenta de cliente, "Mis turnos" y turno por token
+    api/mp/                # OAuth (iniciar y callback) y webhook de Mercado Pago
+    auth/confirm/          # confirmación de email
+supabase/migrations/       # 0001–0011: esquema, RLS, funciones y triggers
 ```
 
-## Decisiones de diseño que vale la pena entender
+## Correrlo localmente
 
-**Dos clientes de Supabase, no uno.** A diferencia de `turnos-bot` (una sola
-función), acá hace falta `client.ts` (navegador) y `server.ts` (servidor) —
-Next.js corre código en los dos lados, y cada uno maneja la sesión distinto.
+1. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
+2. **Crear un proyecto en Supabase y aplicar las migraciones:**
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref TU_PROJECT_REF
+   npx supabase db push
+   ```
+   Usá siempre `npx supabase`: la instalación global (`npm install -g supabase`) está deprecada.
+   - Las migraciones 0010 y 0011 tienen que aplicarse por separado: un valor nuevo de un enum no se puede usar en la misma transacción en que se crea. `db push` ya las aplica así.
+3. **Variables de entorno:**
+   ```bash
+   cp .env.local.example .env.local
+   ```
+   Completá los valores. Las de Mercado Pago solo hacen falta para el cobro online.
+4. **Supabase Auth:** dejá activado *Confirm email*. Las funciones de alta exigen un email verificado.
+5. **Levantarlo:**
+   ```bash
+   npm run dev
+   ```
 
-**`proxy.ts`, no `middleware.ts`.** Next 16 renombró la convención. Cumple
-una función de refresco de sesión, **no** es la única protección de rutas
-(ver comentario en el archivo sobre CVE-2025-29927) — el dashboard también
-valida la sesión del lado del servidor, como segunda capa.
+La conexión con Mercado Pago (OAuth) solo funciona en la URL registrada en la aplicación de MP, no en `localhost`.
 
-**RLS con dos políticas por tabla en varios casos** (`turnos`, `pedidos`,
-`clientes`): una para el negocio dueño, otra para el cliente con cuenta.
-Postgres las combina con OR — si algo "no se ve" cuando debería, revisar que
-estén las dos, no solo una.
+## Estado
 
-**La reserva pública NO usa políticas de RLS abiertas al público.** Para
-calcular horarios libres hace falta leer `turnos` y `bloqueos`, no solo
-`servicios`/`disponibilidad` — y `turnos` tiene datos de clientes reales.
-Abrir eso a "cualquiera" expondría más de lo necesario. En cambio,
-`lib/supabase/publico.ts` usa la secret key (bypasea RLS por diseño, igual
-que la función `telegram-webhook` de `turnos-bot`) y el código decide
-explícitamente qué exponer — nunca las filas crudas.
-
-**Acceso por token para clientes sin cuenta.** Cada turno tiene un
-`token_acceso` (uuid) único — quien tenga ese link puede ver/cancelar/
-reprogramar ESE turno puntual, sin login. Es el mismo patrón que usaba el
-bot con "Mis turnos", adaptado a web.
-
-**Server Actions con `.bind()`** para pasar argumentos (ver
-`servicios/actions.ts` + `page.tsx`): permite que un botón de una lista
-dispare una acción del servidor con el id correcto, sin necesitar un input
-oculto por fila.
-
-## Seguridad
-
-- `.env.local` nunca se versiona (ver `.gitignore`) — sin eso, las
-  credenciales de Supabase quedarían públicas en el repo.
-- Next se mantiene en la versión parcheada más reciente disponible al
-  momento de cada sesión de trabajo — hubo más de un CVE de Denial of
-  Service corregido entre fines de 2025 y mediados de 2026.
+- [x] Panel del negocio: servicios, horarios, agenda, pedidos y datos del negocio
+- [x] Reserva pública, como invitado o con cuenta, y gestión del turno por link
+- [x] Cuentas de cliente con email confirmado y "Mis turnos"
+- [x] Pagos manuales, parciales y totales
+- [x] Cobro online con Mercado Pago (seña o total), en modo prueba
+- [ ] Prueba de pago de punta a punta en sandbox y paso a producción
+- [ ] Avisos por email (pedido listo, turno cancelado)
+- [ ] Suscripción de los negocios a la plataforma
 
 ---
 
