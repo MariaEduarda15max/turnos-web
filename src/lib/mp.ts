@@ -219,9 +219,11 @@ export async function crearPreferencia(
     expires: true,
     expiration_date_from: fechaMp(new Date()),
     expiration_date_to: fechaMp(datos.venceEn),
-    // Comisión de la plataforma: 0 por ahora (decisión 18/10, el ingreso
-    // es la suscripción de la etapa 3).
-    marketplace_fee: 0,
+    // SIN marketplace_fee a propósito (aunque sea 0): con ese campo el
+    // cobro sale en modo marketplace ("MP-MKT-…") y en Uruguay Checkout Pro
+    // solo ofrece dinero en cuenta — ni tarjeta ni efectivo (verificado en
+    // sandbox el 25/11/2026). La comisión de la plataforma es 0 igual: el
+    // ingreso es la suscripción (etapa 3).
     ...(datos.emailPagador ? { payer: { email: datos.emailPagador } } : {}),
   };
 
